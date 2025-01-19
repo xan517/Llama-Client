@@ -3,7 +3,10 @@ using CefSharp;
 using CefSharp.WinForms;
 using HtmlAgilityPack;
 using Newtonsoft.Json;
+using NLog;
 using System;
+using System.Diagnostics;
+using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,6 +25,7 @@ namespace WindowsFormsApp1
         private ChatService chatService;
         private MarkdownRenderer markdownRenderer;
         private ThemeManager themeManager;
+        
 
         public MainForm()
         {
@@ -36,6 +40,8 @@ namespace WindowsFormsApp1
             chatHistoryManager = new ChatHistoryManager(conversationId);
             markdownRenderer = new MarkdownRenderer();
             themeManager = new ThemeManager();
+           
+           
         }
 
         /// <summary>
@@ -71,7 +77,10 @@ namespace WindowsFormsApp1
         private async void connectButton_Click(object sender, EventArgs e)
         {
             string host = hostNameBox.Text.Trim();
-            string apiKey = apiKeyBox.Text.Trim(); // Ensure you have a TextBox named 'apiKeyBox' in your form
+            string apiKey = apiKeyBox.Text.Trim();
+
+            Console.WriteLine($"Host entered: {host}");
+            Console.WriteLine($"API key entered: {apiKey}");
 
             if (string.IsNullOrEmpty(host))
             {
@@ -85,12 +94,20 @@ namespace WindowsFormsApp1
                 return;
             }
 
-            chatService = new ChatService(host, apiKey); // Pass both host and API key
-
-            // Add the connection message only if it hasn't already been added
-            if (!chatHistory.ToString().Contains("[Info]: Connected to Middleware server"))
+            try
             {
-                await AppendMarkdownAsync("[Info]: Connected to Middleware server.");
+                chatService = new ChatService(host, apiKey);
+                Console.WriteLine("ChatService initialized successfully.");
+
+                if (!chatHistory.ToString().Contains("[Info]: Connected to Middleware server"))
+                {
+                    await AppendMarkdownAsync("[Info]: Connected to Middleware server.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to initialize ChatService: {ex.Message}");
+                MessageBox.Show($"Failed to connect: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

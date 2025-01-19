@@ -23,12 +23,12 @@ namespace WindowsFormsApp1
         {
             apiUrl = $"http://{host}:11343/chat"; // Correct endpoint
             //this.apiKey = apiKey;
-            apiKey = "ubuntu"; // Correct API Key. This needs to be passed from the main form. Likely the source of the http error issue.
+            //apiKey = "ubuntu"; // Correct API Key. This needs to be passed from the main form. Likely the source of the http error issue.
 
             if (!string.IsNullOrEmpty(apiKey))
             {
                 httpClient.DefaultRequestHeaders.Clear();
-                httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
+              //  httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
             }
 
             // Define retry policy: retry 3 times with exponential backoff
@@ -104,7 +104,8 @@ namespace WindowsFormsApp1
     catch (HttpRequestException httpEx)
     {
         logger.Error($"HTTP Error: {httpEx.Message}");
-        return $"[HTTP Error]: {httpEx.Message}";
+        Console.WriteLine($"HTTP Error: {httpEx.Message}");
+                return $"[HTTP Error]: {httpEx.Message}";
     }
     catch (JsonException jsonEx)
     {
