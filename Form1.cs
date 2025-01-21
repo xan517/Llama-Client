@@ -96,7 +96,7 @@ namespace WindowsFormsApp1
 
             try
             {
-                chatService = new ChatService(host, apiKey);
+                chatService = new ChatService(host);
                 Console.WriteLine("ChatService initialized successfully.");
 
                 if (!chatHistory.ToString().Contains("[Info]: Connected to Middleware server"))

@@ -137,6 +137,10 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <None Include="GoBackend\databse.go" />
+    <None Include="GoBackend\go.sum" />
+    <None Include="GoBackend\main.go" />
+    <None Include="GoBackend\models.go" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -152,6 +156,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="GoBackend\go.mod" />
     <Content Include="pythonCore.py">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
