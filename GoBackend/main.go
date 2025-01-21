@@ -1,5 +1,4 @@
-﻿// main.go
-package main
+﻿package main
 
 import (
     "bytes"
@@ -21,8 +20,6 @@ var (
     redisClient  *redis.Client
     ctx          = context.Background()
     logrusLogger = logrus.New()
-    // Define your API key (ideally sourced from an environment variable)
-//    API_KEY = getEnv("API_KEY", "your_secure_api_key")
 )
 
 // ChatRequest represents the incoming chat message
@@ -57,9 +54,6 @@ func main() {
 
     // Initialize Gin router
     router := gin.Default()
-
-    // Middleware for API key authentication
-   // router.Use(apiKeyAuth())
 
     // Define routes
     router.GET("/", func(c *gin.Context) {
@@ -96,9 +90,9 @@ func main() {
 
 // Initialize Redis client
 func initRedis() {
-    redisAddr := getEnv("REDIS_ADDR", "redis:6379")
-    redisPassword := getEnv("REDIS_PASSWORD", "") // Set if Redis requires a password
-    redisDB := 0                                   // Default DB
+    redisAddr := getEnv("REDIS_ADDR", "localhost:6379")
+    redisPassword := getEnv("REDIS_PASSWORD", "") // e.g. 'test' if set
+    redisDB := 0
 
     redisClient = redis.NewClient(&redis.Options{
         Addr:     redisAddr,
@@ -114,18 +108,6 @@ func initRedis() {
 
     logrusLogger.Info("Connected to Redis successfully")
 }
-
-// Middleware for API key authentication
-//func apiKeyAuth() gin.HandlerFunc {
-  //  return func(c *gin.Context) {
-    //    apiKey := c.GetHeader("X-API-Key")
-        //if apiKey != API_KEY {
-          //  c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-            //return
-        //}
-     //   c.Next()
-   // }
-//}
 
 // Handle /chat endpoint
 func handleChat(c *gin.Context) {
@@ -182,12 +164,12 @@ func handleChat(c *gin.Context) {
 
     // Prepare the payload for Ollama server
     payload := map[string]interface{}{
-        "model":        "llama3.2",
-        "messages":     messages,
-        "temperature":  0.7,
-        "top_p":        0.9,
-        "max_tokens":   8000,
-        "stream":       false,
+        "model":       "llama3.2",
+        "messages":    messages,
+        "temperature": 0.7,
+        "top_p":       0.9,
+        "max_tokens":  8000,
+        "stream":      false,
     }
 
     payloadBytes, err := json.Marshal(payload)
@@ -199,14 +181,12 @@ func handleChat(c *gin.Context) {
 
     logrusLogger.Debugf("Payload sent to Ollama: %s", string(payloadBytes))
 
-    // Send request to Ollama server
-    ollamaURL := "http://10.0.0.232:11434/v1/chat/completions" // Update if necessary
-
+    // Send request to Ollama server with indefinite or large timeout
     client := &http.Client{
-        Timeout: time.Second * 800,
+        Timeout: 0, // or time.Hour * 24 if you want "effectively infinite"
     }
 
-    ollamaReq, err := http.NewRequest("POST", ollamaURL, bytes.NewBuffer(payloadBytes))
+    ollamaReq, err := http.NewRequest("POST", "http://10.0.0.232:11434/v1/chat/completions", bytes.NewBuffer(payloadBytes))
     if err != nil {
         logrusLogger.Errorf("Failed to create request to Ollama: %v", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create request to AI service."})
@@ -266,7 +246,7 @@ func handleChat(c *gin.Context) {
         return
     }
 
-    // Append the AI response to the database
+    // Insert into DB: user message & AI response
     err = appendToChatHistory(userMessage, aiMessage)
     if err != nil {
         logrusLogger.Errorf("Failed to append to chat history: %v", err)
@@ -278,7 +258,7 @@ func handleChat(c *gin.Context) {
 
     // Update the cache with the new message
     messages = append(messages, map[string]string{"role": "assistant", "content": aiMessage})
-    if len(messages) > 20 { // Keep only the last 20 messages
+    if len(messages) > 20 {
         messages = messages[len(messages)-20:]
     }
     cacheData, err := json.Marshal(messages)
@@ -297,6 +277,7 @@ func handleChat(c *gin.Context) {
 
 // Append chat history to the database
 func appendToChatHistory(userInput, aiResponse string) error {
+    // We store them in the same Chat row
     chat := Chat{
         UserMessage: userInput,
         BotResponse: aiResponse,
@@ -309,15 +290,17 @@ func appendToChatHistory(userInput, aiResponse string) error {
     return nil
 }
 
-// Retrieve chat history from the database
+// Retrieve chat history from the database, merges them to a single array of role/content
 func getChatHistory(limit int) ([]map[string]string, error) {
     var chats []Chat
-    result := DB.Order("id desc").Limit(limit * 2).Find(&chats) // Each chat has user and assistant messages
+    // We store user + AI in one row, so we do 2 * limit to get effectively limit user messages
+    // Adjust as needed
+    result := DB.Order("id desc").Limit(limit * 2).Find(&chats)
     if result.Error != nil {
         return nil, result.Error
     }
 
-    // Reverse to chronological order
+    // Reverse so oldest is first
     for i, j := 0, len(chats)-1; i < j; i, j = i+1, j-1 {
         chats[i], chats[j] = chats[j], chats[i]
     }
@@ -364,15 +347,16 @@ func migrateChatHistory(jsonFilePath string) error {
             continue
         }
 
-        // Check if the entry already exists
+        // Check if already exists
         var existing Chat
+        // We look up by user_message + bot_response
         result := DB.Where("user_message = ? AND bot_response = ?", userMessage, botResponse).First(&existing)
         if result.Error == nil {
             logrusLogger.Infof("Chat entry already exists, skipping: %+v", entry)
             continue
         }
 
-        // Add to database
+        // Insert
         chat := Chat{
             UserMessage: userMessage,
             BotResponse: botResponse,
@@ -382,7 +366,6 @@ func migrateChatHistory(jsonFilePath string) error {
             logrusLogger.Errorf("Failed to create chat entry: %v", err)
             continue
         }
-
         migratedEntries++
     }
 

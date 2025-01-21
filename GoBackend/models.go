@@ -7,7 +7,9 @@ import (
     "gorm.io/gorm"
 )
 
-// Chat represents a chat message between user and assistant
+// Chat represents a single conversation record
+// If you want each user/assistant message as a separate record,
+// you may want a 'role' field and a 'conversation_key' field instead.
 type Chat struct {
     ID          uint           `gorm:"primaryKey" json:"id"`
     UserMessage string         `gorm:"type:text;not null" json:"user_message"`
