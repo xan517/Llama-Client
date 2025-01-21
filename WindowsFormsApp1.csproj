@@ -137,9 +137,11 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <None Include="GoBackend\databse.go" />
+    <None Include="GoBackend\.env" />
+    <None Include="GoBackend\database.go" />
     <None Include="GoBackend\go.sum" />
     <None Include="GoBackend\main.go" />
+    <None Include="GoBackend\message_repository.go" />
     <None Include="GoBackend\models.go" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">

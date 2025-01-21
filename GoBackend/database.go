@@ -15,7 +15,7 @@ var DB *gorm.DB
 
 // InitDatabase initializes the database connection and performs migrations
 func InitDatabase() {
-    dsn := getEnv("DATABASE_URL", "host=localhost user=postgres password=ubuntuhomeserver!! dbname=llama_middleware port=5432 sslmode=disable TimeZone=UTC")
+    dsn := getEnv("DATABASE_URL", "host=localhost user=postgres password=YOURPASS dbname=llama_middleware port=5432 sslmode=disable TimeZone=UTC")
     var err error
     DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
         Logger: logger.Default.LogMode(logger.Info), // Adjust log level as needed
@@ -24,10 +24,10 @@ func InitDatabase() {
         log.Fatalf("Failed to connect to database: %v", err)
     }
 
-    // Auto-migrate the Chat model
-    err = DB.AutoMigrate(&Chat{})
+    // Auto-migrate the ChatMessage model
+    err = DB.AutoMigrate(&ChatMessage{})
     if err != nil {
-        log.Fatalf("Failed to auto-migrate Chat model: %v", err)
+        log.Fatalf("Failed to auto-migrate ChatMessage model: %v", err)
     }
 
     fmt.Println("Database connected and migrated successfully")
@@ -40,3 +40,4 @@ func getEnv(key, defaultVal string) string {
     }
     return defaultVal
 }
+
