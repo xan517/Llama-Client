@@ -33,8 +33,8 @@ namespace WindowsFormsApp1
             this.hostLabel = new System.Windows.Forms.Label();
             this.connectButton = new System.Windows.Forms.Button();
             this.connectionGroupBox = new System.Windows.Forms.GroupBox();
+            this.apiKeyLabel = new System.Windows.Forms.Label();
             this.apiKeyBox = new System.Windows.Forms.TextBox();
-            this.apiKeyLabel = new System.Windows.Forms.Label(); // Added Label for API Key
             this.zoomLabel = new System.Windows.Forms.Label();
             this.zoomTrackBar = new System.Windows.Forms.TrackBar();
             this.chatGroupBox = new System.Windows.Forms.GroupBox();
@@ -63,24 +63,6 @@ namespace WindowsFormsApp1
             this.hostLabel.TabIndex = 1;
             this.hostLabel.Text = "Hostname or IP";
             // 
-            // apiKeyBox
-            // 
-            this.apiKeyBox.Location = new System.Drawing.Point(168, 39);
-            this.apiKeyBox.MaxLength = 100;
-            this.apiKeyBox.Name = "apiKeyBox";
-            this.apiKeyBox.Size = new System.Drawing.Size(200, 20);
-            this.apiKeyBox.TabIndex = 2;
-            this.apiKeyBox.UseSystemPasswordChar = true; // Mask API Key input
-            // 
-            // apiKeyLabel
-            // 
-            this.apiKeyLabel.AutoSize = true;
-            this.apiKeyLabel.Location = new System.Drawing.Point(165, 23);
-            this.apiKeyLabel.Name = "apiKeyLabel";
-            this.apiKeyLabel.Size = new System.Drawing.Size(47, 13);
-            this.apiKeyLabel.TabIndex = 3;
-            this.apiKeyLabel.Text = "API Key";
-            // 
             // connectButton
             // 
             this.connectButton.Location = new System.Drawing.Point(374, 37);
@@ -93,10 +75,10 @@ namespace WindowsFormsApp1
             // 
             // connectionGroupBox
             // 
-            this.connectionGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+            this.connectionGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.connectionGroupBox.Controls.Add(this.apiKeyLabel); // Added API Key Label
-            this.connectionGroupBox.Controls.Add(this.apiKeyBox); // Added API Key Box
+            this.connectionGroupBox.Controls.Add(this.apiKeyLabel);
+            this.connectionGroupBox.Controls.Add(this.apiKeyBox);
             this.connectionGroupBox.Controls.Add(this.zoomLabel);
             this.connectionGroupBox.Controls.Add(this.zoomTrackBar);
             this.connectionGroupBox.Controls.Add(this.connectButton);
@@ -108,6 +90,25 @@ namespace WindowsFormsApp1
             this.connectionGroupBox.TabIndex = 5;
             this.connectionGroupBox.TabStop = false;
             this.connectionGroupBox.Text = "Connection";
+            // 
+            // apiKeyLabel
+            // 
+            this.apiKeyLabel.AutoSize = true;
+            this.apiKeyLabel.Location = new System.Drawing.Point(165, 23);
+            this.apiKeyLabel.Name = "apiKeyLabel";
+            this.apiKeyLabel.Size = new System.Drawing.Size(45, 13);
+            this.apiKeyLabel.TabIndex = 3;
+            this.apiKeyLabel.Text = "API Key";
+            // 
+            // apiKeyBox
+            // 
+            this.apiKeyBox.Location = new System.Drawing.Point(168, 39);
+            this.apiKeyBox.MaxLength = 100;
+            this.apiKeyBox.Name = "apiKeyBox";
+            this.apiKeyBox.Size = new System.Drawing.Size(200, 20);
+            this.apiKeyBox.TabIndex = 2;
+            this.apiKeyBox.Text = "placeholder";
+            this.apiKeyBox.UseSystemPasswordChar = true;
             // 
             // zoomLabel
             // 
@@ -124,18 +125,16 @@ namespace WindowsFormsApp1
             this.zoomTrackBar.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.zoomTrackBar.Location = new System.Drawing.Point(553, 39);
             this.zoomTrackBar.Minimum = -10;
-            this.zoomTrackBar.Maximum = 10;
             this.zoomTrackBar.Name = "zoomTrackBar";
             this.zoomTrackBar.Size = new System.Drawing.Size(200, 45);
             this.zoomTrackBar.TabIndex = 5;
             this.zoomTrackBar.TickStyle = System.Windows.Forms.TickStyle.None;
-            this.zoomTrackBar.Value = 0;
             this.zoomTrackBar.Scroll += new System.EventHandler(this.zoomTrackBar_Scroll);
             // 
             // chatGroupBox
             // 
-            this.chatGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
+            this.chatGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.chatGroupBox.Location = new System.Drawing.Point(12, 98);
             this.chatGroupBox.Name = "chatGroupBox";
@@ -144,22 +143,9 @@ namespace WindowsFormsApp1
             this.chatGroupBox.TabStop = false;
             this.chatGroupBox.Text = "Chat";
             // 
-            // webBrowserOutput
-            // 
-            this.webBrowserOutput = new ChromiumWebBrowser("about:blank")
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(18, 18, 18), // Match dark theme
-                Name = "webBrowserOutput",
-                Size = new System.Drawing.Size(864, 344),
-                TabIndex = 1
-            };
-            this.chatGroupBox.Controls.Add(this.webBrowserOutput); // Add webBrowserOutput to chatGroupBox
-
-            // 
             // inputGroupBox
             // 
-            this.inputGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
+            this.inputGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.inputGroupBox.Controls.Add(this.inputTextBox);
             this.inputGroupBox.Location = new System.Drawing.Point(12, 474);
