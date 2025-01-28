@@ -1,46 +1,170 @@
-﻿using System;
-using System.Drawing;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+﻿// MainForm.cs
 using CefSharp;
 using CefSharp.WinForms;
-using Markdig;
+using HtmlAgilityPack;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+using NLog;
+using System;
+using System.Diagnostics;
+using System.Drawing.Text;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace WindowsFormsApp1
 {
     public partial class MainForm : Form
     {
-        private static readonly HttpClient httpClient = new HttpClient();
-        private string apiUrl = "http://10.0.0.232:11434/api/chat"; // Default Ollama server URL
         private string conversationId;
         private StringBuilder chatHistory; // Store all chat messages
+
+        private ChatHistoryManager chatHistoryManager;
+        private ChatService chatService;
+        private MarkdownRenderer markdownRenderer;
+        private ThemeManager themeManager;
+        
 
         public MainForm()
         {
             InitializeComponent();
             InitializeMarkdownBrowser();
-            inputTextBox.KeyDown += InputTextBox_KeyDown;
+            BindEventHandlers();
+
+            conversationId = Guid.NewGuid().ToString();
+            chatHistory = new StringBuilder();
+
+            // Initialize Managers
+            chatHistoryManager = new ChatHistoryManager(conversationId);
+            markdownRenderer = new MarkdownRenderer();
+            themeManager = new ThemeManager();
+           
+           
+        }
+
+        /// <summary>
+        /// Binds UI event handlers.
+        /// </summary>
+        private void BindEventHandlers()
+        {
+            // inputTextBox KeyDown event is already linked in Designer
             connectButton.Click += connectButton_Click;
             zoomTrackBar.Scroll += zoomTrackBar_Scroll;
             this.FormClosing += MainForm_FormClosing;
             this.Load += MainForm_Load;
-
-            conversationId = Guid.NewGuid().ToString();
-            chatHistory = new StringBuilder();
         }
 
         /// <summary>
-        /// Initializes the Chromium browser with a base HTML template.
+        /// Handles form load to apply themes and load chat history.
+        /// </summary>
+        private async void MainForm_Load(object sender, EventArgs e)
+        {
+            themeManager.ApplyDarkTheme(this);
+
+            // Load chat history from log file
+            var messages = await chatHistoryManager.ReadAllMessagesAsync();
+            foreach (var message in messages)
+            {
+                await AppendMarkdownAsync(message);
+            }
+        }
+
+        /// <summary>
+        /// Handles the Connect button click to set the API URL and initialize ChatService.
+        /// </summary>
+        private async void connectButton_Click(object sender, EventArgs e)
+        {
+            string host = hostNameBox.Text.Trim();
+            string apiKey = apiKeyBox.Text.Trim();
+
+            Console.WriteLine($"Host entered: {host}");
+            Console.WriteLine($"API key entered: {apiKey}");
+
+            if (string.IsNullOrEmpty(host))
+            {
+                MessageBox.Show("Please enter the Middleware server host.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                MessageBox.Show("Please enter the API key.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            try
+            {
+                chatService = new ChatService(host);
+                Console.WriteLine("ChatService initialized successfully.");
+
+                if (!chatHistory.ToString().Contains("[Info]: Connected to Middleware server"))
+                {
+                    await AppendMarkdownAsync("[Info]: Connected to Middleware server.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to initialize ChatService: {ex.Message}");
+                MessageBox.Show($"Failed to connect: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handles the Enter key press in the input textbox to send user input.
+        /// </summary>
+        private async void InputTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter && !e.Shift)
+            {
+                e.SuppressKeyPress = true; // Prevent default new line behavior
+                string userInput = inputTextBox.Text.Trim();
+                inputTextBox.Clear();
+
+                if (!string.IsNullOrEmpty(userInput))
+                {
+                    await AppendMarkdownAsync($"**You:** {userInput}");
+                    await SendUserInput(userInput);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sends the user's input to the AI server and handles the response.
+        /// </summary>
+        private async Task SendUserInput(string input)
+        {
+            if (chatService == null)
+            {
+                await AppendMarkdownAsync("[Error]: Please connect to the Middleware server first.");
+                return;
+            }
+
+            try
+            {
+                ShowLoadingSpinner(true); // Show spinner
+
+                string aiResponse = await chatService.SendMessageAsync(input);
+                await AppendMarkdownAsync($"**AI:** {aiResponse}");
+            }
+            catch (Exception ex)
+            {
+                await AppendMarkdownAsync($"[Unexpected Error]: {ex.Message}");
+            }
+            finally
+            {
+                ShowLoadingSpinner(false); // Hide spinner
+            }
+        }
+
+        /// <summary>
+        /// Initializes the Chromium browser with a base HTML template that includes Highlight.js and necessary scripts.
         /// </summary>
         private void InitializeMarkdownBrowser()
         {
-            // Load initial content with Highlight.js integrated
             string initialHtml = @"
+        <!DOCTYPE html>
         <html>
         <head>
             <meta charset='UTF-8'>
@@ -158,130 +282,11 @@ namespace WindowsFormsApp1
         }
 
 
-        /// <summary>
-        /// Handles actions after the frame has finished loading, such as applying syntax highlighting and scrolling.
-        /// </summary>
-        private void WebBrowserOutput_FrameLoadEnd(object sender, CefSharp.FrameLoadEndEventArgs e)
-        {
-            if (e.Frame.IsMain)
-            {
-                // Execute the combined highlighting and scrolling function
-                webBrowserOutput.ExecuteScriptAsync("applyHighlighting();");
-            }
-        }
 
         /// <summary>
-        /// Handles the Connect button click to set the API URL.
+        /// Appends markdown content to the chat history and updates the browser with syntax highlighting.
         /// </summary>
-        private void connectButton_Click(object sender, EventArgs e)
-        {
-            string host = hostNameBox.Text.Trim();
-
-            if (string.IsNullOrEmpty(host))
-            {
-                MessageBox.Show("Please enter the Ollama server host.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            apiUrl = $"http://{host}:11434/api/chat";
-
-            // Add the connection message only if it hasn't already been added
-            if (!chatHistory.ToString().Contains("[Info]: Connected to Ollama server"))
-            {
-                AppendMarkdown("[Info]: Connected to Ollama server.");
-            }
-        }
-
-        /// <summary>
-        /// Handles the Enter key press in the input textbox to send user input.
-        /// </summary>
-        private async void InputTextBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter && !e.Shift)
-            {
-                e.SuppressKeyPress = true; // Prevent default new line behavior
-                string userInput = inputTextBox.Text.Trim();
-                inputTextBox.Clear();
-
-                if (!string.IsNullOrEmpty(userInput))
-                {
-                    AppendMarkdown($"**You:** {userInput}");
-                    await SendUserInput(userInput);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Sends the user's input to the AI server and handles the response.
-        /// </summary>
-        private async Task SendUserInput(string input)
-        {
-            try
-            {
-                ShowLoadingSpinner(true); // Show spinner
-
-                var payload = new
-                {
-                    model = "llama3.2",
-                    messages = new[]
-                    {
-                        new { role = "user", content = input }
-                    },
-                    stream = false
-                };
-
-                var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-
-                // Remove or comment out the sending message
-                // AppendMarkdown("[Info]: Sending request to AI server...");
-
-                var response = await httpClient.PostAsync(apiUrl, content);
-                response.EnsureSuccessStatusCode();
-
-                var responseString = await response.Content.ReadAsStringAsync();
-               // AppendMarkdown($"[Debug]: Raw response: {responseString}");
-
-                var responseObject = JsonConvert.DeserializeObject<OllamaChatResponse>(responseString, new JsonSerializerSettings
-                {
-                    ContractResolver = new DefaultContractResolver
-                    {
-                        NamingStrategy = new SnakeCaseNamingStrategy()
-                    },
-                    MissingMemberHandling = MissingMemberHandling.Ignore,
-                    NullValueHandling = NullValueHandling.Ignore
-                });
-
-                if (responseObject != null && responseObject.Message != null && !string.IsNullOrEmpty(responseObject.Message.Content))
-                {
-                    AppendMarkdown($"**AI:** {responseObject.Message.Content}");
-                }
-                else
-                {
-                    AppendMarkdown("[Error]: No valid response content received from the server.");
-                }
-            }
-            catch (HttpRequestException httpEx)
-            {
-                AppendMarkdown($"[HTTP Error]: {httpEx.Message}");
-            }
-            catch (JsonException jsonEx)
-            {
-                AppendMarkdown($"[JSON Parsing Error]: {jsonEx.Message}");
-            }
-            catch (Exception ex)
-            {
-                AppendMarkdown($"[Unexpected Error]: {ex.Message}");
-            }
-            finally
-            {
-                ShowLoadingSpinner(false); // Hide spinner
-            }
-        }
-
-        /// <summary>
-        /// Appends markdown content to the chat history and updates the browser.
-        /// </summary>
-        private void AppendMarkdown(string markdown)
+        private async Task AppendMarkdownAsync(string markdown)
         {
             // Prevent duplicates by checking the last message in the history
             var lastMessage = chatHistory.ToString().Trim().Split(new[] { Environment.NewLine }, StringSplitOptions.None).LastOrDefault();
@@ -291,6 +296,7 @@ namespace WindowsFormsApp1
                 return; // Skip appending duplicate messages
             }
 
+            // Append to chatHistory
             if (chatHistory.Length > 0)
             {
                 chatHistory.AppendLine();
@@ -298,33 +304,53 @@ namespace WindowsFormsApp1
 
             chatHistory.AppendLine(markdown);
 
-            // Use Markdown pipeline to convert to HTML
-            var pipeline = new MarkdownPipelineBuilder()
-                .UseAdvancedExtensions()
-                .Build();
+            // Convert Markdown to HTML
+            string html = markdownRenderer.ConvertToHtml(markdown);
 
-            string fullHtml = Markdown.ToHtml(chatHistory.ToString(), pipeline);
+            // Load HTML into HtmlAgilityPack for processing
+            var doc = new HtmlAgilityPack.HtmlDocument();
+            doc.LoadHtml(html);
 
-            // Ensure Highlight.js-compatible structure for code blocks
-            string wrappedHtml = fullHtml.Replace("<code>", "<code class=\"language-csharp\">");
+            // Select all <pre><code> nodes
+            var codeNodes = doc.DocumentNode.SelectNodes("//pre/code");
 
-            // Escape the HTML content for JavaScript injection
+            if (codeNodes != null)
+            {
+                foreach (var codeNode in codeNodes)
+                {
+                    string codeContent = codeNode.InnerText;
+                    string detectedLanguage = LanguageDetector.DetectLanguage(codeContent);
+
+                    if (detectedLanguage != "plaintext")
+                    {
+                        // Add the language- class to the <code> tag
+                        codeNode.SetAttributeValue("class", $"language-{detectedLanguage}");
+                    }
+                }
+            }
+
+            // Get the modified HTML
+            string processedHtml = doc.DocumentNode.InnerHtml;
+
+            // Wrap in a div to ensure structure
+            string wrappedHtml = $"<div>{processedHtml}</div>";
+
+            // Escape the HTML content for JavaScript string
             string escapedHtml = EscapeJavaScriptString(wrappedHtml);
 
-            // Append the message and trigger syntax highlighting
-            string script = $@"
-        appendMessage(`{escapedHtml}`);
-        applyHighlighting();"; // Re-apply syntax highlighting
+            // Append the new message via JavaScript
+            string script = $"appendMessage(`{escapedHtml}`);";
+
+            // Execute the script on the browser
             webBrowserOutput.ExecuteScriptAsync(script);
+
+            // Write the message to the log file
+            await chatHistoryManager.WriteMessageAsync(markdown);
         }
-
-
 
         /// <summary>
         /// Escapes special characters in a string to safely inject into JavaScript.
         /// </summary>
-        /// <param name="input">The input string.</param>
-        /// <returns>The escaped string.</returns>
         private string EscapeJavaScriptString(string input)
         {
             if (string.IsNullOrEmpty(input))
@@ -373,84 +399,14 @@ namespace WindowsFormsApp1
         {
             // No need to call Cef.Shutdown here since it's handled in Program.cs
         }
-
-        /// <summary>
-        /// Applies a dark theme to all controls recursively.
-        /// </summary>
-        private void ApplyDarkTheme(Control control)
-        {
-            if (control is GroupBox)
-            {
-                control.BackColor = Color.FromArgb(30, 30, 30);
-                control.ForeColor = Color.White;
-            }
-            else if (control is TextBox || control is RichTextBox)
-            {
-                control.BackColor = Color.FromArgb(45, 45, 48);
-                control.ForeColor = Color.White;
-            }
-            else if (control is Button button)
-            {
-                button.BackColor = Color.FromArgb(50, 50, 50);
-                button.ForeColor = Color.White;
-            }
-            else
-            {
-                control.BackColor = Color.FromArgb(30, 30, 30);
-                control.ForeColor = Color.White;
-            }
-
-            foreach (Control childControl in control.Controls)
-            {
-                ApplyDarkTheme(childControl);
-            }
-        }
-
-        /// <summary>
-        /// Handles form load to apply themes and initial settings.
-        /// </summary>
-        private void MainForm_Load(object sender, EventArgs e)
-        {
-            this.BackColor = Color.FromArgb(30, 30, 30);
-            this.ForeColor = Color.White;
-
-            foreach (Control control in this.Controls)
-            {
-                ApplyDarkTheme(control);
-            }
-        }
     }
 
     /// <summary>
     /// Represents the structure of the AI server's chat response.
     /// </summary>
-    public class OllamaChatResponse
+    public class ChatResponse
     {
-        [JsonProperty("model")]
-        public string Model { get; set; }
-
-        [JsonProperty("created_at")]
-        public DateTime CreatedAt { get; set; }
-
-        [JsonProperty("message")]
-        public OllamaMessage Message { get; set; }
-
-        [JsonProperty("done_reason")]
-        public string DoneReason { get; set; }
-
-        [JsonProperty("done")]
-        public bool Done { get; set; }
-    }
-
-    /// <summary>
-    /// Represents the message structure within the AI server's response.
-    /// </summary>
-    public class OllamaMessage
-    {
-        [JsonProperty("role")]
-        public string Role { get; set; }
-
-        [JsonProperty("content")]
-        public string Content { get; set; }
+        [JsonProperty("response")]
+        public string Response { get; set; }
     }
 }
